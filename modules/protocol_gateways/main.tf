@@ -207,6 +207,17 @@ resource "aws_launch_template" "this" {
   }
   user_data = base64encode(local.custom_data)
 
+  lifecycle {
+    # The root module calls this module with depends_on, which defers every
+    # data source here to apply time on a fresh deployment. Tie the launch
+    # template to the ENA Express support check so an unsupported instance
+    # type fails before any gateway is created, not after.
+    precondition {
+      condition     = !var.ena_express_enabled || data.aws_ec2_instance_type.ena_express[0].ena_srd_supported
+      error_message = "ENA Express is enabled but instance type ${var.instance_type} does not support it. See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ena-express.html#ena-express-supported-instance-types"
+    }
+  }
+
   depends_on = [aws_placement_group.this]
 }
 

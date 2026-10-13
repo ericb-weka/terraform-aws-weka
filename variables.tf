@@ -787,6 +787,24 @@ variable "smb_protocol_gateway_instance_type" {
   default     = "c5n.2xlarge"
 }
 
+variable "smb_protocol_gateway_ena_express_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable ENA Express (AWS SRD) on the SMB protocol gateways' primary (kernel/management) network interface, with matching MTU, ring and TCP tuning on the host. Requires an instance type that supports ENA Express; SMB clients must also have ENA Express enabled and be in the same availability zone to benefit. Only gateways launched after the change are affected."
+}
+
+variable "smb_protocol_gateway_ena_express_udp_enabled" {
+  type        = bool
+  default     = false
+  description = "Also carry UDP traffic over ENA Express on the SMB protocol gateways' primary network interface. Only applies when smb_protocol_gateway_ena_express_enabled is true."
+}
+
+variable "smb_protocol_gateway_ena_express_mtu" {
+  type        = number
+  default     = 8900
+  description = "MTU set on the SMB protocol gateways' primary network interface when ENA Express is enabled. AWS recommends 8800-8900; ENA Express does not carry packets larger than 8900 bytes."
+}
+
 variable "smb_protocol_gateway_fe_cores_num" {
   type        = number
   description = "The protocol gateways' NICs number."

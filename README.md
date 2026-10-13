@@ -666,6 +666,31 @@ To join an SMB cluster in Active Directory, need to run manually command:
 
 `weka smb domain join <smb_domain_username> <smb_domain_password> [--server smb_server_name]`.
 
+### ENA Express for SMB protocol gateways
+[ENA Express](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ena-express.html) uses AWS Scalable Reliable Datagram (SRD)
+to improve TCP throughput and tail latency between instances in the same availability zone. To enable it on the SMB
+protocol gateways' primary (kernel/management) network interface, which carries the SMB traffic, set:
+```hcl
+smb_protocol_gateway_instance_type       = "c6in.8xlarge"  # must support ENA Express; the default c5n.2xlarge does not
+smb_protocol_gateway_ena_express_enabled = true
+```
+Optional:
+```hcl
+smb_protocol_gateway_ena_express_udp_enabled = false  # also carry UDP over ENA Express
+smb_protocol_gateway_ena_express_mtu         = 8900   # 1500-8900, AWS recommends 8800-8900
+```
+When enabled, the gateways are launched with ENA Express on their primary ENI and their user data first applies the matching
+host tuning (MTU, ENA ring sizes, `tcp_limit_output_bytes`/`tcp_autocorking` sysctls), keeps the MTU across DHCP renewals
+(systemd-networkd, NetworkManager and dhclient hosts) and re-applies it on every boot. The WEKA DPDK interfaces are not changed.
+
+Notes:
+- ENA Express only takes effect when both ends support and enable it: the SMB clients must also run on
+  [supported instance types](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ena-express.html#ena-express-supported-instance-types)
+  with ENA Express enabled, in the same availability zone.
+- An unsupported `smb_protocol_gateway_instance_type` fails the plan, or on a fresh deployment the apply, before any gateway is created.
+- Only gateways launched after the change get ENA Express; existing gateways keep their launch template version and user data.
+- The MTU of the gateways' primary interface changes from the VPC default 9001 to `smb_protocol_gateway_ena_express_mtu`.
+
 
 ### prerequisites:
 - protocol_gateway_instance_iam_profile_arn
@@ -1074,6 +1099,9 @@ The `helper_commands` part in the output provides lambda call that can be used t
 | <a name="input_smb_capacity_reservation_id"></a> [smb\_capacity\_reservation\_id](#input\_smb\_capacity\_reservation\_id) | The ID of the capacity reservation in which to run the smb clients | `string` | `null` | no |
 | <a name="input_smb_cluster_name"></a> [smb\_cluster\_name](#input\_smb\_cluster\_name) | The name of the SMB setup. | `string` | `"Weka-SMB"` | no |
 | <a name="input_smb_domain_name"></a> [smb\_domain\_name](#input\_smb\_domain\_name) | The domain to join the SMB cluster to. | `string` | `""` | no |
+| <a name="input_smb_protocol_gateway_ena_express_enabled"></a> [smb\_protocol\_gateway\_ena\_express\_enabled](#input\_smb\_protocol\_gateway\_ena\_express\_enabled) | Enable ENA Express (AWS SRD) on the SMB protocol gateways' primary (kernel/management) network interface, with matching MTU, ring and TCP tuning on the host. Requires an instance type that supports ENA Express; SMB clients must also have ENA Express enabled and be in the same availability zone to benefit. Only gateways launched after the change are affected. | `bool` | `false` | no |
+| <a name="input_smb_protocol_gateway_ena_express_mtu"></a> [smb\_protocol\_gateway\_ena\_express\_mtu](#input\_smb\_protocol\_gateway\_ena\_express\_mtu) | MTU set on the SMB protocol gateways' primary network interface when ENA Express is enabled. AWS recommends 8800-8900; ENA Express does not carry packets larger than 8900 bytes. | `number` | `8900` | no |
+| <a name="input_smb_protocol_gateway_ena_express_udp_enabled"></a> [smb\_protocol\_gateway\_ena\_express\_udp\_enabled](#input\_smb\_protocol\_gateway\_ena\_express\_udp\_enabled) | Also carry UDP traffic over ENA Express on the SMB protocol gateways' primary network interface. Only applies when smb\_protocol\_gateway\_ena\_express\_enabled is true. | `bool` | `false` | no |
 | <a name="input_smb_protocol_gateway_fe_cores_num"></a> [smb\_protocol\_gateway\_fe\_cores\_num](#input\_smb\_protocol\_gateway\_fe\_cores\_num) | The protocol gateways' NICs number. | `number` | `1` | no |
 | <a name="input_smb_protocol_gateway_instance_ami_id"></a> [smb\_protocol\_gateway\_instance\_ami\_id](#input\_smb\_protocol\_gateway\_instance\_ami\_id) | AMI ID to use, Amazon Linux 2023 is the supported OS. | `string` | `null` | no |
 | <a name="input_smb_protocol_gateway_instance_iam_profile_arn"></a> [smb\_protocol\_gateway\_instance\_iam\_profile\_arn](#input\_smb\_protocol\_gateway\_instance\_iam\_profile\_arn) | The protocol gateway instance IAM profile ARN | `string` | `""` | no |

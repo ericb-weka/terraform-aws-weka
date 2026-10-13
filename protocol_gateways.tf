@@ -8,6 +8,9 @@ module "smb_protocol_gateways" {
   iam_base_name                       = "${local.iam_prefix}-${var.cluster_name}-smb-protocol-gateway"
   cluster_name                        = var.cluster_name
   protocol                            = "SMB"
+  ena_express_enabled                 = var.smb_protocol_gateway_ena_express_enabled
+  ena_express_udp_enabled             = var.smb_protocol_gateway_ena_express_udp_enabled
+  ena_express_mtu                     = var.smb_protocol_gateway_ena_express_mtu
   frontend_container_cores_num        = var.smb_protocol_gateway_fe_cores_num
   secondary_ips_per_nic               = var.smb_protocol_gateway_secondary_ips_per_nic
   instance_type                       = var.smb_protocol_gateway_instance_type
