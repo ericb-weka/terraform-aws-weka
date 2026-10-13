@@ -681,15 +681,19 @@ smb_protocol_gateway_ena_express_mtu         = 8900   # 1500-8900, AWS recommend
 ```
 When enabled, the gateways are launched with ENA Express on their primary ENI and their user data first applies the matching
 host tuning (MTU, ENA ring sizes, `tcp_limit_output_bytes`/`tcp_autocorking` sysctls), keeps the MTU across DHCP renewals
-(systemd-networkd, NetworkManager and dhclient hosts) and re-applies it on every boot. The WEKA DPDK interfaces are not changed.
+and re-applies it on every boot. This is tested on the default Amazon Linux 2023 AMI (systemd-networkd) and on Amazon Linux 2
+(dhclient); NetworkManager-based custom AMIs (RHEL, Rocky) are handled on a best-effort basis. The WEKA DPDK interfaces are not changed.
 
 Notes:
 - ENA Express only takes effect when both ends support and enable it: the SMB clients must also run on
   [supported instance types](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ena-express.html#ena-express-supported-instance-types)
   with ENA Express enabled, in the same availability zone.
-- An unsupported `smb_protocol_gateway_instance_type` fails the plan, or on a fresh deployment the apply, before any gateway is created.
+- An unsupported `smb_protocol_gateway_instance_type` fails the plan on an existing deployment. On a fresh deployment the check
+  runs during apply, after the shared resources (network, lambdas, backends) exist but before any gateway is created; fix the
+  type and apply again. To check a type up front:
+  `aws ec2 describe-instance-types --instance-types <type> --query 'InstanceTypes[0].NetworkInfo.EnaSrdSupported'`
 - Only gateways launched after the change get ENA Express; existing gateways keep their launch template version and user data.
-- The MTU of the gateways' primary interface changes from the VPC default 9001 to `smb_protocol_gateway_ena_express_mtu`.
+- The MTU of the gateways' primary interface changes from the EC2 default of 9001 to `smb_protocol_gateway_ena_express_mtu`.
 
 
 ### prerequisites:
