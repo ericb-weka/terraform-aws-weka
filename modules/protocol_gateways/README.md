@@ -37,6 +37,7 @@ No modules.
 | [aws_placement_group.this](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/placement_group) | resource |
 | [aws_ami.amzn_ami](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/ami) | data source |
 | [aws_ami.provided_ami](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/ami) | data source |
+| [aws_ec2_instance_type.ena_express](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/ec2_instance_type) | data source |
 | [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
 | [aws_subnet.selected](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/subnet) | data source |
 
@@ -53,6 +54,9 @@ No modules.
 | <a name="input_deploy_lambda_name"></a> [deploy\_lambda\_name](#input\_deploy\_lambda\_name) | The name of the deploy function | `string` | n/a | yes |
 | <a name="input_ebs_encrypted"></a> [ebs\_encrypted](#input\_ebs\_encrypted) | Enables EBS encryption on the volume | `bool` | `true` | no |
 | <a name="input_ebs_kms_key_id"></a> [ebs\_kms\_key\_id](#input\_ebs\_kms\_key\_id) | The ARN of the AWS Key Management Service | `string` | `""` | no |
+| <a name="input_ena_express_enabled"></a> [ena\_express\_enabled](#input\_ena\_express\_enabled) | Enable ENA Express (AWS SRD) on the protocol gateways' primary (kernel/management) network interface and apply the matching MTU, ring and TCP tuning on the host. Requires an instance type that supports ENA Express. | `bool` | `false` | no |
+| <a name="input_ena_express_mtu"></a> [ena\_express\_mtu](#input\_ena\_express\_mtu) | MTU applied to the primary network interface when ENA Express is enabled. AWS recommends 8800-8900; ENA Express does not carry packets larger than 8900 bytes. | `number` | `8900` | no |
+| <a name="input_ena_express_udp_enabled"></a> [ena\_express\_udp\_enabled](#input\_ena\_express\_udp\_enabled) | Also carry UDP traffic over ENA Express on the primary network interface. Only applies when ena\_express\_enabled is true. | `bool` | `false` | no |
 | <a name="input_fetch_lambda_name"></a> [fetch\_lambda\_name](#input\_fetch\_lambda\_name) | The name of the fetch function | `string` | n/a | yes |
 | <a name="input_frontend_container_cores_num"></a> [frontend\_container\_cores\_num](#input\_frontend\_container\_cores\_num) | Number of frontend cores to use on instances, this number will reflect on number of NICs attached to instance, as each weka core requires dedicated NIC | `number` | `1` | no |
 | <a name="input_gateways_name"></a> [gateways\_name](#input\_gateways\_name) | The protocol group name. | `string` | n/a | yes |
