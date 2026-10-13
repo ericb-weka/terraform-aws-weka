@@ -89,7 +89,11 @@ locals {
 
   setup_protocol_script = var.setup_protocol ? compact([local.setup_init_protocol_script, local.smb_protocol_script, local.s3_protocol_script]) : []
 
-  custom_data_parts = concat([local.init_script], local.setup_protocol_script)
+  # ENA Express host tuning runs ahead of init.sh, only when enabled, so the
+  # user data is unchanged for existing deployments.
+  ena_express_script = var.ena_express_enabled ? [templatefile("${path.module}/ena_express.sh", { mtu = var.ena_express_mtu })] : []
+
+  custom_data_parts = concat(local.ena_express_script, [local.init_script], local.setup_protocol_script)
 
   custom_data          = join("\n", local.custom_data_parts)
   placement_group_name = var.use_placement_group ? var.placement_group_name == null ? aws_placement_group.this[0].name : var.placement_group_name : null
