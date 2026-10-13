@@ -85,10 +85,17 @@ EOF
       echo "$(date -u): could not resolve the systemd-networkd file for $iface"
     fi
   elif systemctl is-active --quiet NetworkManager; then
-    # RHEL / Rocky and other NetworkManager distributions.
-    conn=$(nmcli -g GENERAL.CONNECTION device show "$iface" 2>/dev/null)
-    if [ -n "$conn" ]; then
-      nmcli connection modify "$conn" 802-3-ethernet.mtu ${mtu} && echo "$(date -u): set NetworkManager mtu on '$conn'"
+    # RHEL / Rocky and other NetworkManager distributions. Match the profile by
+    # UUID (names are not unique) and reapply so the live device picks the MTU
+    # up now rather than at the next DHCP renewal.
+    conn=$(nmcli -g GENERAL.CON-UUID device show "$iface" 2>/dev/null)
+    if [ -n "$conn" ] && [ "$conn" != "--" ]; then
+      if nmcli connection modify "$conn" 802-3-ethernet.mtu ${mtu}; then
+        nmcli device reapply "$iface" || nmcli connection up "$conn" || true
+        echo "$(date -u): set NetworkManager mtu ${mtu} on connection $conn"
+      else
+        echo "$(date -u): nmcli connection modify failed for $conn"
+      fi
     else
       echo "$(date -u): could not resolve the NetworkManager connection for $iface"
     fi
@@ -96,12 +103,18 @@ EOF
     # Amazon Linux 2 and other dhclient/network-scripts distributions.
     # The enter hook covers the dhclient already running; dhclient.conf covers
     # every later start; ifcfg covers the network service itself.
-    cat > /etc/dhcp/dhclient-enter-hooks <<'EOF'
-#!/bin/bash
+    mkdir -p /etc/dhcp
+    hook=/etc/dhcp/dhclient-enter-hooks
+    if ! grep -q 'ENA Express' "$hook" 2>/dev/null; then
+      # Append to any hook the AMI already ships rather than replacing it.
+      [ -f "$hook" ] || echo '#!/bin/bash' > "$hook"
+      cat >> "$hook" <<'EOF'
+
 # ENA Express: keep the primary ENI MTU, ignore the DHCP-advertised 9001.
 new_interface_mtu=${mtu}
 EOF
-    chmod 0755 /etc/dhcp/dhclient-enter-hooks
+      chmod 0755 "$hook"
+    fi
     grep -q 'supersede interface-mtu' /etc/dhcp/dhclient.conf 2>/dev/null || echo "supersede interface-mtu ${mtu};" >> /etc/dhcp/dhclient.conf
     ifcfg="/etc/sysconfig/network-scripts/ifcfg-$iface"
     if [ -f "$ifcfg" ] && ! grep -q '^MTU=' "$ifcfg"; then
@@ -121,6 +134,16 @@ EOF
 
   systemctl daemon-reload
   systemctl enable --now ena-express-tune.service || /usr/local/sbin/ena-express-tune.sh
+
+  # A ring resize briefly resets the ENA device. Make sure the link and IMDS
+  # are back before the WEKA bootstrap (which curls IMDS under set -e) starts.
+  # Bounded and never fatal.
+  for _ in $(seq 1 30); do
+    if ip link show "$iface" | grep -q 'state UP' && curl -s -m 2 -o /dev/null http://169.254.169.254/; then
+      break
+    fi
+    sleep 1
+  done
 
   ip link show "$iface"
   echo "$(date -u): ENA Express host setup done"
