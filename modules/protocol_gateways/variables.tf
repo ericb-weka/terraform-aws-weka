@@ -220,3 +220,26 @@ variable "root_volume_size" {
   default     = null
   description = "root disk size."
 }
+
+variable "ena_express_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable ENA Express (AWS SRD) on the protocol gateways' primary (kernel/management) network interface and apply the matching MTU, ring and TCP tuning on the host. Requires an instance type that supports ENA Express."
+}
+
+variable "ena_express_udp_enabled" {
+  type        = bool
+  default     = false
+  description = "Also carry UDP traffic over ENA Express on the primary network interface. Only applies when ena_express_enabled is true."
+}
+
+variable "ena_express_mtu" {
+  type        = number
+  default     = 8900
+  description = "MTU applied to the primary network interface when ENA Express is enabled. AWS recommends 8800-8900; ENA Express does not carry packets larger than 8900 bytes."
+
+  validation {
+    condition     = var.ena_express_mtu >= 1500 && var.ena_express_mtu <= 8900
+    error_message = "ena_express_mtu must be between 1500 and 8900."
+  }
+}
