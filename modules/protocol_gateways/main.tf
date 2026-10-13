@@ -15,6 +15,20 @@ data "aws_ami" "amzn_ami" {
   }
 }
 
+# Fails the plan early if ENA Express is requested on an instance type that
+# does not support it (e.g. the default c5n.2xlarge).
+data "aws_ec2_instance_type" "ena_express" {
+  count         = var.ena_express_enabled ? 1 : 0
+  instance_type = var.instance_type
+
+  lifecycle {
+    postcondition {
+      condition     = self.ena_srd_supported
+      error_message = "ENA Express is enabled but instance type ${var.instance_type} does not support it. See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ena-express.html#ena-express-supported-instance-types"
+    }
+  }
+}
+
 data "aws_ami" "provided_ami" {
   count = var.ami_id != null ? 1 : 0
   filter {
@@ -145,6 +159,18 @@ resource "aws_launch_template" "this" {
     device_index                = 0
     security_groups             = var.sg_ids
     subnet_id                   = var.subnet_id
+
+    # ENA Express (SRD) on the primary (kernel/management) ENI. The DPDK ENIs
+    # attached later by init.sh are not affected.
+    dynamic "ena_srd_specification" {
+      for_each = var.ena_express_enabled ? [1] : []
+      content {
+        ena_srd_enabled = true
+        ena_srd_udp_specification {
+          ena_srd_udp_enabled = var.ena_express_udp_enabled
+        }
+      }
+    }
   }
 
   placement {
