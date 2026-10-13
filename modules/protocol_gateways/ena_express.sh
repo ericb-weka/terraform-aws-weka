@@ -19,16 +19,30 @@
   fi
   echo "$(date -u): primary interface is $iface"
 
+  # Record the primary interface so the tune script does not depend on the
+  # default route being present at the moment it runs (networkd briefly drops
+  # it while reconfiguring the interface).
+  echo "IFACE=$iface" > /etc/ena-express.conf
+
   # Runtime tuning, re-applied on every boot by ena-express-tune.service.
   cat > /usr/local/sbin/ena-express-tune.sh <<'EOF'
 #!/bin/bash
-# Applies MTU and ring sizes to the default-route interface for ENA Express.
+# Applies MTU and ring sizes to the primary interface for ENA Express.
 mtu=${mtu}
 tx_ring_target=1024
 rx_ring_target=8192
 
-iface=$(ip -o -4 route show default | awk '{print $5; exit}')
-[ -z "$iface" ] && { echo "no default-route interface"; exit 0; }
+IFACE=""
+[ -f /etc/ena-express.conf ] && . /etc/ena-express.conf
+iface=$IFACE
+if [ -z "$iface" ] || ! ip link show "$iface" >/dev/null 2>&1; then
+  for _ in $(seq 1 30); do
+    iface=$(ip -o -4 route show default | awk '{print $5; exit}')
+    [ -n "$iface" ] && break
+    echo "waiting for default route"; sleep 1
+  done
+fi
+[ -z "$iface" ] && { echo "no primary interface found"; exit 0; }
 
 ip link set dev "$iface" mtu "$mtu" && echo "$iface mtu set to $mtu"
 
@@ -81,6 +95,12 @@ UseMTU=false
 EOF
       echo "$(date -u): wrote $dropin_dir/90-ena-express-mtu.conf"
       networkctl reload || true
+      # networkd re-applies the interface config and the default route is
+      # briefly gone; wait for it (route back after networkctl reload).
+      for _ in $(seq 1 30); do
+        ip -o -4 route show default | grep -q . && break
+        sleep 1
+      done
     else
       echo "$(date -u): could not resolve the systemd-networkd file for $iface"
     fi
